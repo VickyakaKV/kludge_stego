@@ -6,8 +6,26 @@
 #include<errno.h> 
 #include<netinet/tcp.h>
 #include<netinet/ip.h> 
-#include <arpa/inet.h>
- 
+#include<arpa/inet.h>
+
+char *read_file(char path[]){
+    FILE *fileptr;
+    char *buffer;
+    long filelen;
+
+    fileptr = fopen(path, "rb");  // Open the file in binary mode
+    if(fileptr == NULL)
+        printf("error");
+    fseek(fileptr, 0, SEEK_END);          
+    filelen = ftell(fileptr);            
+    rewind(fileptr);                      
+
+    buffer = (char *)malloc((filelen+1)*sizeof(char)); // Enough memory for file + \0
+    fread(buffer, filelen, 1, fileptr); 
+    fclose(fileptr); 
+    return buffer;
+}
+
 struct pseudo_header{
     u_int32_t source_address;
     u_int32_t dest_address;
@@ -57,7 +75,7 @@ int main (void){
     struct iphdr *iph = (struct iphdr *) datagram;
      
     //TCP header
-    struct tcphdr *tcph = (struct tcphdr *) (datagram + sizeof (struct ip));
+    struct tcphdr *tcph = (struct tcphdr *) (datagram + sizeof (struct iphdr));
     struct sockaddr_in sin;
     struct pseudo_header psh;
      
@@ -66,10 +84,10 @@ int main (void){
     strcpy(data, "Hello");
      
     //Address resolution
-    strcpy(source_ip , "192.168.1.2");
+    strcpy(source_ip , "192.168.43.25");
     sin.sin_family = AF_INET;
     sin.sin_port = htons(80);
-    sin.sin_addr.s_addr = inet_addr ("1.2.3.4");
+    sin.sin_addr.s_addr = inet_addr ("172.217.163.46");
      
     //Complete IP Header
     iph->ihl = 5;
@@ -86,11 +104,11 @@ int main (void){
      
     //Ip checksum
     iph->check = csum ((unsigned short *) datagram, iph->tot_len);
-     
+    
     //Complete TCP Header
-    tcph->source = htons (1234);
+    tcph->source = htons (33906);
     tcph->dest = htons (80);
-    tcph->seq = 9;
+    tcph->seq = 0;
     tcph->ack_seq = 0;
     tcph->doff = 5;  //tcp header size
     tcph->fin=0;
@@ -127,11 +145,28 @@ int main (void){
     }
      
     //Send the packet
-    if (sendto (s, datagram, iph->tot_len ,  0, (struct sockaddr *) &sin, sizeof (sin)) < 0){
+    int32_t sequence;
+    char path[20];
+    printf("Enter name of file to be hidden: ");
+    scanf("%s",path);
+    int byte_count = 0;
+    char *msg = read_file(path);
+
+    while(msg[byte_count] != '\0'){
+        sequence = (int32_t)msg[byte_count];
+        while(byte_count % 4 != 3){
+            byte_count++;
+            sequence = sequence | (((int32_t)msg[byte_count]) << (8*(byte_count % 4))); 
+        }
+        
+        tcph->seq = sequence;
+        if (sendto (s, datagram, iph->tot_len ,  0, (struct sockaddr *) &sin, sizeof (sin)) < 0){
             perror("Failed to send");
-    }
-    else{
-         printf ("Packet Sent %d\n",tcph->seq);
+        }
+        else{
+            printf ("Packet Sent %d\n",sequence);
+        }
+        byte_count++;
     }
 
     return 0;
