@@ -29,7 +29,7 @@ void decode(unsigned char* buffer, int size){
         int seq = tcph->seq;
         int count=0;
         while(count < 4){
-            msg[count] = (char)(255 | (seq >> (8 * count)));
+            msg[count] = (char)(255 & (seq >> (8 * count)));
         }
         printf("%s", msg);
     }
