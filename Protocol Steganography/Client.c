@@ -76,7 +76,7 @@ int ProcessPacket(unsigned char* buffer, int size){
         memset(&source, 0, sizeof(source));
         source.sin_addr.s_addr = iph->saddr;
         dest.sin_addr.s_addr = iph->daddr;
-        if(strcmp(inet_ntoa(source.sin_addr),"172.217.163.46")==0){
+        if(strcmp(inet_ntoa(source.sin_addr),"192.168.43.107")==0){
             my_ip = inet_ntoa(dest.sin_addr);
             return ntohs(tcph->dest);
         }
@@ -117,7 +117,7 @@ int main (int argc, char const *argv[]){
     strcpy(source_ip , "192.168.43.25");
     sin.sin_family = AF_INET;
     sin.sin_port = htons(80);
-    sin.sin_addr.s_addr = inet_addr ("172.217.163.46");
+    sin.sin_addr.s_addr = inet_addr ("192.168.43.107");
   
      
     //Complete IP Header
@@ -181,6 +181,11 @@ int main (int argc, char const *argv[]){
         return -1;
     }
 
+    if (connect(sock, (struct sockaddr *)&sin, sizeof(sin)) < 0){
+        printf("\nConnection Failed \n");
+        return -1;
+    }
+    send(sock , "hello" , strlen("hello") , 0 );
     //Send the packet
     int32_t sequence;
     char path[20];
@@ -191,10 +196,7 @@ int main (int argc, char const *argv[]){
     int saddr_size , data_size;
     
     while(1){
-        if (connect(sock, (struct sockaddr *)&sin, sizeof(sin)) < 0){
-            printf("\nConnection Failed \n");
-            return -1;
-        }
+        
         int port =0;
         saddr_size = sizeof(struct sockaddr);
         
@@ -214,6 +216,7 @@ int main (int argc, char const *argv[]){
             break;
         }
     }
+    
     while(msg[byte_count] != '\0'){
         sequence = (int32_t)msg[byte_count];
         while(byte_count % 4 != 3){

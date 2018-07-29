@@ -13,30 +13,38 @@
 #include <sys/ipc.h>
 #include <sys/uio.h>
 
+unsigned short iphdrlen;
+struct iphdr *iph;     
+struct tcphdr *tcph;
+int flag = 0;
+FILE *secret;
+
 void error(char *msg){
     perror(msg);
     exit(1);
 }
 
 void decode(unsigned char* buffer, int size){
-    unsigned short iphdrlen;
-    struct iphdr *iph = (struct iphdr*)buffer;
-    iphdrlen = iph->ihl*4;
-     
-    struct tcphdr *tcph=(struct tcphdr*)(buffer + iphdrlen);
     if(iph->protocol == 6){
         char *msg = (char *)malloc(5);
         int seq = tcph->seq;
         int count=0;
         while(count < 4){
             msg[count] = (char)(255 & (seq >> (8 * count)));
+	    if((int)msg[count] == 10)
+		flag = 1;
+            count++;
         }
-        printf("%s", msg);
+	fputs(msg, secret);
     }
 }
 
 int main(int argc, char *argv[]){
-
+    
+    secret = fopen("secret.txt","w");
+    if(secret == NULL)
+	printf("Unable to create file");
+    secret = fopen("secret.txt","a");
     int sockfd, newsockfd, portno, clilen;
     unsigned char *buffer = (unsigned char *)malloc(65536);
     struct sockaddr_in serv_addr, cli_addr;
@@ -89,6 +97,7 @@ int main(int argc, char *argv[]){
     int s = socket(AF_INET , SOCK_RAW , IPPROTO_TCP);
     int saddr_size , data_size;
     struct sockaddr saddr;
+    int start = 0;
 
     while(1){
         saddr_size = sizeof(struct sockaddr);
@@ -100,7 +109,16 @@ int main(int argc, char *argv[]){
             return 1;
         }
         //Now process the packet
-        decode(buffer, data_size);
+        iph = (struct iphdr*)buffer;
+        iphdrlen = iph->ihl*4;
+        tcph=(struct tcphdr*)(buffer + iphdrlen);
+        if((tcph->fin == 1) && (ntohl(tcph->dest) == portno))
+            return 0;
+	if(start == 1)
+            decode(buffer, data_size);
+	start = 1;
+	if(flag == 1)
+	    return 0;
     }
     return 0;
 }
